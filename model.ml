@@ -102,8 +102,8 @@ type problem = { initial_grid : int option grid }
 
 let print_problem problem : unit = 
   let string_of_element = function
-    | None -> " "
-    | x -> string_of_int (Option.get x)
+    | None -> "?"
+    | Some x -> string_of_int x
   in
   print_grid string_of_element problem
 
@@ -121,5 +121,15 @@ type solution = int grid
 
 let print_solution solution = print_grid string_of_int solution
 
-let is_valid_solution problem solution = 
-  (map_grid Option.get problem) = solution
+let is_valid_solution (problem : problem) (solution : solution) = 
+  let nums = [1;2;3;4;5;6;7;8;9] in
+  let valid_part f = 
+    List.for_all (
+      fun box -> List.for_all (
+        fun num -> Array.mem num box
+        ) 
+        nums
+        ) 
+        (f solution)
+  in
+  (valid_part rows) && (valid_part columns) && (valid_part boxes)
