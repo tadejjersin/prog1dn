@@ -16,7 +16,7 @@ let available_elements loc grid =
   let check_area f x ind = if Array.mem (Some x) (f grid ind) then false else true in
   let row_ind = loc / 9 in
   let col_ind = loc mod 9 in
-  let box_ind = 3 * (row_ind / 3) + (col_ind mod 3) in
+  let box_ind = 3 * (row_ind / 3) + (col_ind / 3) in
   List.filter (
     fun num -> 
       check_area Model.get_row num row_ind && 
@@ -65,18 +65,19 @@ let branch_state (state : state) : (state * state) option =
      v prvem predpostavi, da hipoteza velja, v drugem pa ravno obratno.
      Če bo vaš algoritem najprej poizkusil prvo možnost, vam morda pri drugi
      za začetek ni treba zapravljati preveč časa, saj ne bo nujno prišla v poštev. *)
-  match state.available.possible with 
+  let state' = find_next_empty state in
+  match state'.available.possible with 
     | [] -> None
     | x :: xs -> Some (
-      { current_grid = replace_element_in_grid state.current_grid state.available.loc x; 
-        problem = state.problem; 
+      { current_grid = replace_element_in_grid state'.current_grid state'.available.loc x; 
+        problem = state'.problem; 
         available = { 
-        loc = state.available.loc + 1; 
-        possible = available_elements (state.available.loc + 1) state.current_grid } },
-      { current_grid = (Model.copy_grid state.current_grid); 
-        problem = state.problem; 
+        loc = state'.available.loc + 1; 
+        possible = available_elements (state'.available.loc + 1) state'.current_grid } },
+      { current_grid = (Model.copy_grid state'.current_grid); 
+        problem = state'.problem; 
         available = { 
-        loc = state.available.loc; 
+        loc = state'.available.loc; 
         possible = xs } }
     )
 
