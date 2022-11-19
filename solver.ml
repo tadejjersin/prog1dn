@@ -12,17 +12,6 @@ let print_state (state : state) : unit =
 
 type response = Solved of Model.solution | Unsolved of state | Fail of state
 
-let available_elements (loc : int * int) grid = 
-  let check_area f x ind = if Array.mem (Some x) (f grid ind) then false else true in
-  let row_ind = fst loc in
-  let col_ind = snd loc in
-  let box_ind = 3 * (row_ind / 3) + (col_ind / 3) in
-  List.filter (
-    fun num -> 
-      check_area (Model.get_row) num row_ind && 
-      check_area (Model.get_column) num col_ind && 
-      check_area (Model.get_box) num box_ind) 
-      [1;2;3;4;5;6;7;8;9] 
 
 let replace_element_in_grid (grid : int option Model.grid) (loc : int * int) (x : int) = 
  let row_ind = fst loc in
@@ -45,7 +34,18 @@ let rec find_next_empty (state : state) : state =
       problem = state.problem; 
       available = { 
       loc = next_loc state.available.loc; 
-      possible = available_elements (next_loc state.available.loc) state.current_grid } } )
+      possible = [1;2;3;4;5;6;7;8;9] } } )
+
+let check_if_ok (state : state) (x : int) =
+  let row_ind = fst state.available.loc in
+  let col_ind = snd state.available.loc in 
+  let box_ind = 3 * (row_ind / 3) + (col_ind / 3) in
+  if 
+    Array.mem (Some x) (Model.get_row state.current_grid (row_ind)) ||
+    Array.mem (Some x) (Model.get_column state.current_grid (col_ind)) ||
+    Array.mem (Some x) (Model.get_box state.current_grid (box_ind))
+  then false
+  else true
 
 let initialize_state (problem : Model.problem) : state = 
   {
@@ -53,7 +53,7 @@ let initialize_state (problem : Model.problem) : state =
   problem = problem; 
   available = { 
     loc = (0, 0); 
-    possible = available_elements (0, 0) problem.initial_grid }
+    possible = [1;2;3;4;5;6;7;8;9] }
   } 
 
 let validate_state (state : state) : response =
@@ -72,16 +72,25 @@ let branch_state (state : state) : (state * state) option =
      se je treba odločiti. Če ta obstaja, stanje razveji na dve stanji:
      v prvem predpostavi, da hipoteza velja, v drugem pa ravno obratno.
      Če bo vaš algoritem najprej poizkusil prvo možnost, vam morda pri drugi
-     za začetek ni treba zapravljati preveč časa, saj ne bo nujno prišla v poštev. *)
+     za začetek ni treba zapravljati preveč časa, saj ne bo nujno prišla v poštev. *)   
   let state' = find_next_empty state in
-  match state'.available.possible with 
-    | [] -> None
-    | x :: xs -> Some (
+  let rec first_ok_el list = 
+    if list = [] then None else (
+      let head = List.hd list in 
+      let tail = List.tl list in 
+      match check_if_ok state' head with
+       | false -> first_ok_el tail
+       | true -> Some (head, tail)
+    )
+  in 
+  match first_ok_el state'.available.possible with 
+    | None -> None
+    | Some (x, xs) -> Some (
       { current_grid = replace_element_in_grid state'.current_grid state'.available.loc x; 
         problem = state'.problem; 
         available = { 
         loc = next_loc state'.available.loc; 
-        possible = available_elements (next_loc state'.available.loc) state'.current_grid } },
+        possible = [1;2;3;4;5;6;7;8;9] } },
       { current_grid = (Model.copy_grid state'.current_grid); 
         problem = state'.problem; 
         available = { 
@@ -93,7 +102,7 @@ let branch_state (state : state) : (state * state) option =
 let rec solve_state (state : state) =
   (* uveljavimo trenutne omejitve in pogledamo, kam smo prišli *)
   (* TODO: na tej točki je stanje smiselno počistiti in zožiti možne rešitve *)
-  (* Printf.printf "ind: %i, %i " (fst state.available.loc) (snd state.available.loc); *)
+
   match validate_state state with
   | Solved solution ->
       (* če smo našli rešitev, končamo *)
