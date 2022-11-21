@@ -12,19 +12,23 @@ let print_state (state : state) : unit =
 
 type response = Solved of Model.solution | Unsolved of state | Fail of state
 
-
+(* Zamenja element na mestu (x, y) v sudokuju z elementom x *)
 let replace_element_in_grid (grid : int option Model.grid) (loc : int * int) (x : int) = 
  let row_ind = fst loc in
   let col_ind = snd loc in
   let _ = grid.(row_ind).(col_ind) <- Some x in 
   grid
       
-let next_loc loc = 
+
+(* Funkcija za določanje naslednjega mesta v mreži, če se premikamo najprej po prvi vrstici, potem po drugi... *)
+let next_loc (loc : int * int) = 
   match fst loc, snd loc with
   | 8, 8 -> (8, 8)
   | x, 8 -> ((x + 1), 0)
   | x, y -> (x, (y+1))
       
+
+(* Vrne state, s trenutno lokacijo na naslednjem praznem mestu *)
 let rec find_next_empty (state : state) : state = 
   let row_ind = fst state.available.loc in
   let col_ind = snd state.available.loc in
@@ -36,7 +40,9 @@ let rec find_next_empty (state : state) : state =
       loc = next_loc state.available.loc; 
       possible = [1;2;3;4;5;6;7;8;9] } } )
 
-let check_if_ok (state : state) (x : int) =
+
+(* Preveri, če x lahko vstavimo na (a, b) mesto v sudokuju *)
+let check_if_ok (state : state) (x : int) : bool =
   let row_ind = fst state.available.loc in
   let col_ind = snd state.available.loc in 
   let box_ind = 3 * (row_ind / 3) + (col_ind / 3) in
@@ -72,18 +78,24 @@ let branch_state (state : state) : (state * state) option =
      se je treba odločiti. Če ta obstaja, stanje razveji na dve stanji:
      v prvem predpostavi, da hipoteza velja, v drugem pa ravno obratno.
      Če bo vaš algoritem najprej poizkusil prvo možnost, vam morda pri drugi
-     za začetek ni treba zapravljati preveč časa, saj ne bo nujno prišla v poštev. *)   
+     za začetek ni treba zapravljati preveč časa, saj ne bo nujno prišla v poštev. *)  
   let state' = find_next_empty state in
-  let rec first_ok_el list = 
+  (* Poišče prvo število od 1 do 9, ki ga lahko vstavimo na trenutno mesto v sudokuju 
+    in ga vrne skupaj s preostankom seznama *)
+  let rec first_ok_element (list : int list) : (int * (int list)) option = 
     if list = [] then None else (
       let head = List.hd list in 
       let tail = List.tl list in 
       match check_if_ok state' head with
-       | false -> first_ok_el tail
+       | false -> first_ok_element tail
        | true -> Some (head, tail)
     )
   in 
-  match first_ok_el state'.available.possible with 
+  (* Prva možnost na trenutno mesto vstavi število, ki ga dobimo iz first_ok_element in 
+     se premakne na naslednje prazno mesto, druga pa na trenutnem mestu od možnosti za 
+     možne elemente odstrani zgoraj omenjeno število. Če je seznam možnih števil prazen 
+     vrne None. *)
+  match first_ok_element state'.available.possible with 
     | None -> None
     | Some (x, xs) -> Some (
       { current_grid = replace_element_in_grid state'.current_grid state'.available.loc x; 
