@@ -117,15 +117,15 @@ let get_expansion_from_string (str : string) (c : char) =
   aux [] 0 
 
 (* Vrne seznam termometrov, ki so seznami parov int*int. *)
-let get_t (string_t : string list) = 
+let get_t (st : string) = 
   let helper str =
     str |> String.split_on_char ';' |>
     List.map (fun s -> (int_of_char s.[1] - 48, int_of_char s.[3] - 48))
   in 
-  List.map helper string_t
+  List.map helper (get_expansion_from_string st 'T')
 
 (* Vrne seznam puščic *)
-let get_a (string_a : string list) = 
+let get_a (st : string) = 
   let helper str =
     let a_head = (int_of_char str.[1] - 48, int_of_char str.[3] - 48) in 
     let a_tail = String.sub str 9 ((String.length str) - 9) in 
@@ -133,10 +133,10 @@ let get_a (string_a : string list) =
     List.map (fun s -> (int_of_char s.[1] - 48, int_of_char s.[3] - 48)) in 
     (a_head, a_tail')
   in 
-  List.map helper string_a
+  List.map helper (get_expansion_from_string st 'A')
 
 (* Vrne seznam kletk *)
-let get_k (string_k : string list) = 
+let get_k (st : string) = 
   let helper str = 
     let border_index = String.index_from str 0 ' ' in 
     let k_value = int_of_string (String.sub str 0 border_index) in 
@@ -145,12 +145,15 @@ let get_k (string_k : string list) =
     List.map (fun s -> (int_of_char s.[1] - 48, int_of_char s.[3] - 48)) in 
     (k_value, k_tail')
   in 
-  List.map helper string_k
+  List.map helper (get_expansion_from_string st 'K')
 
 
 (* Model za vhodne probleme *)
 
-type problem = { initial_grid : int option grid }
+type problem = { initial_grid : int option grid; 
+  t : (int * int) list list; 
+  a : ((int * int) * (int * int) list) list;
+  k : (int * (int * int) list) list }
 
 let print_problem problem : unit = 
   let string_of_element = function
@@ -165,7 +168,10 @@ let problem_of_string str =
     | c when '1' <= c && c <= '9' -> Some (Some (Char.code c - Char.code '0'))
     | _ -> None
   in
-  { initial_grid = grid_of_string cell_of_char str }
+  { initial_grid = grid_of_string cell_of_char (get_string_of_grid_from_string str);
+    t = get_t str;
+    a = get_a str;
+    k = get_k str }
 
 (* Model za izhodne rešitve *)
 
