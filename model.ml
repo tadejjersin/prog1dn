@@ -96,6 +96,58 @@ let grid_of_string cell_of_char str =
     failwith "Nepravilno število stolpcev";
   grid
 
+(* Funkcije za branje razširitev *)
+
+let get_string_of_grid_from_string str = 
+  String.sub str 0 357
+
+(* Funkcija za branje posameznih vrstic termometrov, puščic in kletk. Vrne seznam
+  stringov le-teh. *)
+let get_expansion_from_string (str : string) (c : char) = 
+  let rec aux acc i =
+    let starting_index = String.index_from_opt str i c in 
+    if starting_index = None then acc 
+    else if str.[(Option.get starting_index) + 1] = ':' then 
+      let end_index = String.index_from str (Option.get starting_index) '\n' in
+      let str_len = end_index - (Option.get starting_index + 3) in
+      aux ((String.sub str ((Option.get starting_index) + 3) str_len) :: acc) end_index
+    else  
+      aux acc ((Option.get starting_index) + 1)  
+  in 
+  aux [] 0 
+
+(* Vrne seznam termometrov, ki so seznami parov int*int. *)
+let get_t (string_t : string list) = 
+  let helper str =
+    str |> String.split_on_char ';' |>
+    List.map (fun s -> (int_of_char s.[1] - 48, int_of_char s.[3] - 48))
+  in 
+  List.map helper string_t
+
+(* Vrne seznam puščic *)
+let get_a (string_a : string list) = 
+  let helper str =
+    let a_head = (int_of_char str.[1] - 48, int_of_char str.[3] - 48) in 
+    let a_tail = String.sub str 9 ((String.length str) - 9) in 
+    let a_tail' = a_tail |> String.split_on_char ';' |>
+    List.map (fun s -> (int_of_char s.[1] - 48, int_of_char s.[3] - 48)) in 
+    (a_head, a_tail')
+  in 
+  List.map helper string_a
+
+(* Vrne seznam kletk *)
+let get_k (string_k : string list) = 
+  let helper str = 
+    let border_index = String.index_from str 0 ' ' in 
+    let k_value = int_of_string (String.sub str 0 border_index) in 
+    let k_tail = String.sub str (border_index + 1) (String.length str - border_index - 1) in 
+    let k_tail' = k_tail |> String.split_on_char ';' |>
+    List.map (fun s -> (int_of_char s.[1] - 48, int_of_char s.[3] - 48)) in 
+    (k_value, k_tail')
+  in 
+  List.map helper string_k
+
+
 (* Model za vhodne probleme *)
 
 type problem = { initial_grid : int option grid }
