@@ -200,5 +200,15 @@ let is_valid_solution (problem : problem) (solution : solution) =
     if List.mem false (List.map is_sorted t_values) then false
     else true
   in 
+  let valid_k k_list = 
+    let values k = List.map (fun x -> solution.(fst x).(snd x)) k in 
+    let value_sum k = List.fold_left (+) 0 (values k) in 
+    let rec check_all_different = function
+      | [] -> true
+      | x :: xs -> if List.mem x xs then false else check_all_different xs
+    in
+    let bool_list = List.map (fun x -> (value_sum (snd x) = fst x) && (check_all_different (values (snd x)))) k_list in
+    if List.mem false bool_list then false else true
+  in 
   (valid_part rows) && (valid_part columns) && (valid_part boxes) &&
-  (valid_t problem.t)
+  (valid_t problem.t) && (valid_k problem.k)
