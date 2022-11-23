@@ -190,4 +190,15 @@ let is_valid_solution (problem : problem) (solution : solution) =
         ) 
         (f solution)
   in
-  (valid_part rows) && (valid_part columns) && (valid_part boxes)
+  let valid_t t_list = 
+    let t_values = List.map (fun x -> List.map (fun y -> solution.(fst y).(snd y)) x) t_list in 
+    let rec is_sorted = function 
+      | [] -> true
+      | x :: [] -> true
+      | x :: x' :: xs -> if x < x' then is_sorted (x' :: xs) else false
+    in
+    if List.mem false (List.map is_sorted t_values) then false
+    else true
+  in 
+  (valid_part rows) && (valid_part columns) && (valid_part boxes) &&
+  (valid_t problem.t)

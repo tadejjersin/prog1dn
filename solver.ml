@@ -41,6 +41,21 @@ let rec find_next_empty (state : state) : state =
       possible = [1;2;3;4;5;6;7;8;9] } } )
 
 
+let get_t_values (state : state) (x: int) (t : (int * int) list) = 
+  List.map (fun y -> if state.available.loc = y then (Some x) else state.current_grid.(fst y).(snd y)) t
+
+let check_if_x_fits_in_t (state : state) (x : int) = 
+  let rec is_sorted = function 
+      | [] -> true
+      | y :: [] -> true
+      | y :: y' :: ys -> if y < y' then is_sorted (y' :: ys) else false
+  in
+  (List.filter (List.mem state.available.loc) state.problem.t) |>
+  List.map (get_t_values state x) |>
+  List.map (List.filter Option.is_some) |>
+  List.map is_sorted
+
+
 (* Preveri, če x lahko vstavimo na (a, b) mesto v sudokuju *)
 let check_if_ok (state : state) (x : int) : bool =
   let row_ind = fst state.available.loc in
@@ -49,7 +64,8 @@ let check_if_ok (state : state) (x : int) : bool =
   if 
     Array.mem (Some x) (Model.get_row state.current_grid (row_ind)) ||
     Array.mem (Some x) (Model.get_column state.current_grid (col_ind)) ||
-    Array.mem (Some x) (Model.get_box state.current_grid (box_ind))
+    Array.mem (Some x) (Model.get_box state.current_grid (box_ind)) ||
+    List.mem false (check_if_x_fits_in_t state x)
   then false
   else true
 
