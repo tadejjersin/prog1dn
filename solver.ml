@@ -74,6 +74,23 @@ let check_if_x_fits_in_k (state : state) (x : int) =
   List.map (get_k_values state) |>
   List.map (myfun)
 
+let get_a_values (state : state) (a : (int * int) * (int * int) list) = 
+  (state.current_grid.(fst (fst a)).(snd (fst a)),
+  List.map (fun y -> state.current_grid.(fst y).(snd y)) (snd a))
+
+let check_if_x_fits_in_a (state : state) (x : int) =
+  let myfun a = 
+    let a_values = get_a_values state a in
+    let right_sum = List.filter Option.is_some (snd a_values) |> List.map Option.get |> List.fold_left (+) 0 in 
+    let left_num = if Option.is_none (fst a_values) then 0 else Option.get (fst a_values) in 
+    let a_full_len = List.length (snd a) in 
+    let a_len = (List.filter Option.is_some (snd a_values) |> List.length) + 1 in 
+    if state.available.loc = (fst a) then (if a_full_len = a_len && x != right_sum then false else true) 
+    else if (a_full_len = a_len && (right_sum + x) != left_num) || (right_sum + x > 9) then false else true
+  in   
+  List.filter (fun y -> List.mem state.available.loc (snd y) || fst y = state.available.loc) state.problem.a |>
+  List.map (myfun) 
+
 (* Preveri, če x lahko vstavimo na (a, b) mesto v sudokuju *)
 let check_if_ok (state : state) (x : int) : bool =
   let row_ind = fst state.available.loc in
@@ -84,7 +101,8 @@ let check_if_ok (state : state) (x : int) : bool =
     Array.mem (Some x) (Model.get_column state.current_grid (col_ind)) ||
     Array.mem (Some x) (Model.get_box state.current_grid (box_ind)) ||
     List.mem false (check_if_x_fits_in_t state x) ||
-    List.mem false (check_if_x_fits_in_k state x)
+    List.mem false (check_if_x_fits_in_k state x) ||
+    List.mem false (check_if_x_fits_in_a state x)
   then false
   else true
 

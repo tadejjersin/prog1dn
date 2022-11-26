@@ -210,5 +210,12 @@ let is_valid_solution (problem : problem) (solution : solution) =
     let bool_list = List.map (fun x -> (value_sum (snd x) = fst x) && (check_all_different (values (snd x)))) k_list in
     if List.mem false bool_list then false else true
   in 
+  let valid_a a_list = 
+    let left_value a = solution.(fst a).(snd a) in 
+    let right_values a = List.map (fun x -> solution.(fst x).(snd x)) a in 
+    let right_value_sum a = List.fold_left (+) 0 (right_values a) in
+    let bool_list = List.map (fun x -> left_value (fst x) = right_value_sum (snd x)) a_list in
+    if List.mem false bool_list then false else true 
+  in 
   (valid_part rows) && (valid_part columns) && (valid_part boxes) &&
-  (valid_t problem.t) && (valid_k problem.k)
+  (valid_t problem.t) && (valid_k problem.k) && (valid_a problem.a)
