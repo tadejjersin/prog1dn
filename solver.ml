@@ -3,9 +3,7 @@ type available = { loc : int * int; possible : int list }
 
 (* TODO: tip stanja ustrezno popravite, saj boste med reševanjem zaradi učinkovitosti
    želeli imeti še kakšno dodatno informacijo *)
-type state = { problem : Model.problem; current_grid : int option Model.grid; 
-              available : available;
-              priority : (int * int) list}
+type state = { problem : Model.problem; current_grid : int option Model.grid; available : available}
 
 let print_state (state : state) : unit =
   Model.print_grid
@@ -14,66 +12,33 @@ let print_state (state : state) : unit =
 
 type response = Solved of Model.solution | Unsolved of state | Fail of state
 
-(* Zamenja element na mestu (x, y) v sudokuju z elementom x *)
+(* Zamenja element na mestu (a, b) v sudokuju z elementom x *)
 let replace_element_in_grid (grid : int option Model.grid) (loc : int * int) (x : int) = 
  let row_ind = fst loc in
   let col_ind = snd loc in
-  let _ = grid.(row_ind).(col_ind) <- Some x in 
+  grid.(row_ind).(col_ind) <- Some x;
   grid
       
-let priority_indexes (problem : Model.problem) = 
-  let k_list = List.map (fun x -> snd x) problem.k |> List.fold_left (@) [] in
-  let a_list = List.map (fun x ->fst x :: snd x) problem.a |> List.fold_left (@) [] in
-  let t_list = List.fold_left (@) [] problem.t in 
-  k_list @ a_list @ t_list
 
 (* Funkcija za določanje naslednjega mesta v mreži, če se premikamo najprej po prvi vrstici, potem po drugi... *)
-
+let next_loc (loc : int * int) = 
+  match fst loc, snd loc with
+  | 8, 8 -> (8, 8)
+  | x, 8 -> ((x + 1), 0)
+  | x, y -> (x, (y+1))
       
 
 (* Vrne state, s trenutno lokacijo na naslednjem praznem mestu *)
 let rec find_next_empty (state : state) : state = 
   let row_ind = fst state.available.loc in
-  let col_ind = snd state.available.loc in 
-  (* let a = if priority = [] then (99,99) else (List.hd priority) in 
-  Printf.printf "r: %i x: %i p: %i %i \n" row_ind col_ind (fst a) (snd a); *)
-  let next_loc loc = 
-    match fst loc, snd loc with
-    | 8, 8 -> (0, 0)
-    | x, 8 -> ((x + 1), 0)
-    | x, y -> (x, (y+1))
-  in 
-  match state.priority with 
-  | x :: xs -> if state.current_grid.(fst x).(snd x) = None then { 
-    current_grid = state.current_grid; 
-    problem = state.problem; 
-    available = { 
-    loc = x; 
-    possible = [1;2;3;4;5;6;7;8;9] };
-    priority = xs } else (
-    let state' = { current_grid = state.current_grid; 
-      problem = state.problem; 
-      available = { 
-      loc = x; 
-      possible = [1;2;3;4;5;6;7;8;9] };
-      priority = xs} 
-    in 
-    find_next_empty state' 
-  )
-  | [] -> if state.current_grid.(row_ind).(col_ind) = None then state else 
-    find_next_empty ( { current_grid = state.current_grid; 
-      problem = state.problem; 
-      available = { 
-      loc = next_loc state.available.loc; 
-      possible = [1;2;3;4;5;6;7;8;9] };
-      priority = [] } ) 
-  (* match state.current_grid.(row_ind).(col_ind) with 
+  let col_ind = snd state.available.loc in
+  match state.current_grid.(row_ind).(col_ind) with 
     | None -> state
     | _ -> find_next_empty ( { current_grid = state.current_grid; 
       problem = state.problem; 
       available = { 
       loc = next_loc state.available.loc; 
-      possible = [1;2;3;4;5;6;7;8;9] } } ) *)
+      possible = [1;2;3;4;5;6;7;8;9] } } )
 
 
 let get_t_values (state : state) (x: int) (t : (int * int) list) = 
@@ -126,7 +91,7 @@ let check_if_x_fits_in_a (state : state) (x : int) =
   List.filter (fun y -> List.mem state.available.loc (snd y) || fst y = state.available.loc) state.problem.a |>
   List.map (myfun) 
 
-(* Preveri, če x lahko vstavimo na (a, b) mesto v sudokuju *)
+(* Preveri, če x lahko vstavimo na trenutno mesto v sudokuju *)
 let check_if_ok (state : state) (x : int) : bool =
   let row_ind = fst state.available.loc in
   let col_ind = snd state.available.loc in 
@@ -141,14 +106,33 @@ let check_if_ok (state : state) (x : int) : bool =
   then false
   else true
 
+let replace_element_and_go_to_next_loc (state : state) (x : int): state = 
+  { current_grid = replace_element_in_grid state.current_grid state.available.loc x; 
+        problem = state.problem; 
+        available = { 
+        loc = next_loc state.available.loc; 
+        possible = [1;2;3;4;5;6;7;8;9] } }
+
+let get_empty_squares (problem : Model.problem) = 
+  let rec get_empty_squares_from_row acc row row_ind i=
+    if i = 9 then List.rev acc
+    else if row.(i) = None then get_empty_squares_from_row ((row_ind, i) :: acc) row row_ind (i+1) 
+    else get_empty_squares_from_row acc row row_ind (i+1) 
+  in 
+  let rec aux acc grid i = 
+    if i = 9 then acc 
+    else aux ((get_empty_squares_from_row [] grid.(i) i 0) @ acc) grid (i+1)
+  in 
+  aux [] problem.initial_grid 0 |> Array.of_list
+
 let initialize_state (problem : Model.problem) : state = 
+  let empty_squares = get_empty_squares problem in 
   {
   current_grid = Model.copy_grid problem.initial_grid; 
   problem = problem; 
   available = { 
     loc = (0, 0); 
-    possible = [1;2;3;4;5;6;7;8;9] };
-  priority = priority_indexes problem
+    possible = [1;2;3;4;5;6;7;8;9] }
   } 
 
 let validate_state (state : state) : response =
@@ -168,7 +152,7 @@ let branch_state (state : state) : (state * state) option =
      v prvem predpostavi, da hipoteza velja, v drugem pa ravno obratno.
      Če bo vaš algoritem najprej poizkusil prvo možnost, vam morda pri drugi
      za začetek ni treba zapravljati preveč časa, saj ne bo nujno prišla v poštev. *)  
-  let state' = find_next_empty state  in
+  let state' = find_next_empty state in
   (* Poišče prvo število od 1 do 9, ki ga lahko vstavimo na trenutno mesto v sudokuju 
     in ga vrne skupaj s preostankom seznama *)
   let rec first_ok_element (list : int list) : (int * (int list)) option = 
@@ -187,18 +171,12 @@ let branch_state (state : state) : (state * state) option =
   match first_ok_element state'.available.possible with 
     | None -> None
     | Some (x, xs) -> Some (
-      { current_grid = replace_element_in_grid state'.current_grid state'.available.loc x; 
-        problem = state'.problem; 
-        available = { 
-        loc = state'.available.loc; 
-        possible = [1;2;3;4;5;6;7;8;9] };
-        priority = priority_indexes state'.problem },
+      replace_element_and_go_to_next_loc state' x,
       { current_grid = (Model.copy_grid state'.current_grid); 
         problem = state'.problem; 
         available = { 
         loc = state'.available.loc; 
-        possible = xs };
-        priority = state'.priority }
+        possible = xs } }
     )
 
 (* pogledamo, če trenutno stanje vodi do rešitve *)
@@ -235,3 +213,4 @@ and explore_state (state : state) =
 
 let solve_problem (problem : Model.problem) =
   problem |> initialize_state |> solve_state
+
