@@ -1,9 +1,12 @@
-type available = { loc : int * int; possible : int list }
+type available = { loc : int; possible : int list }
 
 
 (* TODO: tip stanja ustrezno popravite, saj boste med reševanjem zaradi učinkovitosti
    želeli imeti še kakšno dodatno informacijo *)
-type state = { problem : Model.problem; current_grid : int option Model.grid; available : available}
+type state = { problem : Model.problem; 
+              current_grid : int option Model.grid; 
+              starting_empty_squares : (int * int) array;
+              available : available}
 
 let print_state (state : state) : unit =
   Model.print_grid
@@ -21,14 +24,15 @@ let replace_element_in_grid (grid : int option Model.grid) (loc : int * int) (x 
       
 
 (* Funkcija za določanje naslednjega mesta v mreži, če se premikamo najprej po prvi vrstici, potem po drugi... *)
-let next_loc (loc : int * int) = 
+(* let next_loc (loc : int * int) = 
   match fst loc, snd loc with
   | 8, 8 -> (8, 8)
   | x, 8 -> ((x + 1), 0)
-  | x, y -> (x, (y+1))
+  | x, y -> (x, (y+1)) *)
       
 
 (* Vrne state, s trenutno lokacijo na naslednjem praznem mestu *)
+(*
 let rec find_next_empty (state : state) : state = 
   let row_ind = fst state.available.loc in
   let col_ind = snd state.available.loc in
@@ -36,21 +40,24 @@ let rec find_next_empty (state : state) : state =
     | None -> state
     | _ -> find_next_empty ( { current_grid = state.current_grid; 
       problem = state.problem; 
+      starting_empty_squares = state.starting_empty_squares;
       available = { 
       loc = next_loc state.available.loc; 
-      possible = [1;2;3;4;5;6;7;8;9] } } )
+      possible = [1;2;3;4;5;6;7;8;9] } } ) *)
 
 
 let get_t_values (state : state) (x: int) (t : (int * int) list) = 
-  List.map (fun y -> if state.available.loc = y then (Some x) else state.current_grid.(fst y).(snd y)) t
+  let current_loc = state.starting_empty_squares.(state.available.loc) in 
+  List.map (fun y -> if current_loc = y then (Some x) else state.current_grid.(fst y).(snd y)) t
 
 let check_if_x_fits_in_t (state : state) (x : int) = 
+  let current_loc = state.starting_empty_squares.(state.available.loc) in 
   let rec is_sorted = function 
       | [] -> true
       | y :: [] -> true
       | y :: y' :: ys -> if y < y' then is_sorted (y' :: ys) else false
   in
-  (List.filter (List.mem state.available.loc) state.problem.t) |>
+  (List.filter (List.mem current_loc) state.problem.t) |>
   List.map (get_t_values state x) |>
   List.map (List.filter Option.is_some) |>
   List.map is_sorted
@@ -59,6 +66,7 @@ let get_k_values (state : state) (k : int * (int * int) list) =
   (fst k, List.map (fun y -> state.current_grid.(fst y).(snd y)) (snd k))
 
 let check_if_x_fits_in_k (state : state) (x : int) =
+  let current_loc = state.starting_empty_squares.(state.available.loc) in 
   let myfun k = 
     if List.mem (Some x) (snd k) then false 
     else 
@@ -70,7 +78,7 @@ let check_if_x_fits_in_k (state : state) (x : int) =
       else if (k_sum + x) = fst k then true 
       else false
   in 
-  List.filter (fun y -> List.mem state.available.loc (snd y)) state.problem.k |>
+  List.filter (fun y -> List.mem current_loc (snd y)) state.problem.k |>
   List.map (get_k_values state) |>
   List.map (myfun)
 
@@ -79,22 +87,24 @@ let get_a_values (state : state) (a : (int * int) * (int * int) list) =
   List.map (fun y -> state.current_grid.(fst y).(snd y)) (snd a))
 
 let check_if_x_fits_in_a (state : state) (x : int) =
+  let current_loc = state.starting_empty_squares.(state.available.loc) in 
   let myfun a = 
     let a_values = get_a_values state a in
     let right_sum = List.filter Option.is_some (snd a_values) |> List.map Option.get |> List.fold_left (+) 0 in 
     let left_num = if Option.is_none (fst a_values) then 0 else Option.get (fst a_values) in 
     let a_full_len = List.length (snd a) in 
     let a_len = (List.filter Option.is_some (snd a_values) |> List.length) + 1 in 
-    if state.available.loc = (fst a) then (if a_full_len = a_len && x != right_sum then false else true) 
+    if current_loc = (fst a) then (if a_full_len = a_len && x != right_sum then false else true) 
     else if (a_full_len = a_len && (right_sum + x) != left_num) || (right_sum + x > 9) then false else true
   in   
-  List.filter (fun y -> List.mem state.available.loc (snd y) || fst y = state.available.loc) state.problem.a |>
+  List.filter (fun y -> List.mem current_loc (snd y) || fst y = current_loc) state.problem.a |>
   List.map (myfun) 
 
 (* Preveri, če x lahko vstavimo na trenutno mesto v sudokuju *)
 let check_if_ok (state : state) (x : int) : bool =
-  let row_ind = fst state.available.loc in
-  let col_ind = snd state.available.loc in 
+  let current_loc = state.starting_empty_squares.(state.available.loc) in 
+  let row_ind = fst current_loc in
+  let col_ind = snd current_loc in 
   let box_ind = 3 * (row_ind / 3) + (col_ind / 3) in
   if 
     Array.mem (Some x) (Model.get_row state.current_grid (row_ind)) ||
@@ -107,10 +117,12 @@ let check_if_ok (state : state) (x : int) : bool =
   else true
 
 let replace_element_and_go_to_next_loc (state : state) (x : int): state = 
-  { current_grid = replace_element_in_grid state.current_grid state.available.loc x; 
+  let current_loc = state.starting_empty_squares.(state.available.loc) in 
+  { current_grid = replace_element_in_grid state.current_grid current_loc x; 
         problem = state.problem; 
+        starting_empty_squares = state.starting_empty_squares;
         available = { 
-        loc = next_loc state.available.loc; 
+        loc = state.available.loc + 1; 
         possible = [1;2;3;4;5;6;7;8;9] } }
 
 let get_empty_squares (problem : Model.problem) = 
@@ -123,15 +135,104 @@ let get_empty_squares (problem : Model.problem) =
     if i = 9 then acc 
     else aux ((get_empty_squares_from_row [] grid.(i) i 0) @ acc) grid (i+1)
   in 
-  aux [] problem.initial_grid 0 |> Array.of_list
+  aux [] problem.initial_grid 0 |> Array.of_list 
+  (* let sqaure_list = aux [] problem.initial_grid 0 in 
+  let get_square_availabilty (x, y) = 
+    let box_ind = 3 * (x / 3) + (y / 3) in
+    [1;2;3;4;5;6;7;8;9] 
+    |> List.filter (fun a -> (Array.mem (Some a) (Model.get_row problem.initial_grid x) = false))
+    |> List.filter (fun a -> (Array.mem (Some a) (Model.get_column problem.initial_grid y) = false))
+    |> List.filter (fun a -> (Array.mem (Some a) (Model.get_box problem.initial_grid box_ind) = false))
+    |> List.length
+  in 
+  let rec aux' acc lst = 
+    match lst with
+    | [] -> acc
+    | x :: xs -> aux' (((get_square_availabilty x), x) :: acc) xs
+  in 
+  let max_ind = aux' [] sqaure_list |> List.sort compare |> List.hd |> snd in 
+  let rec aux'' acc lst x = 
+    match lst with 
+    | [] -> List.rev acc
+    | y :: ys when y = x -> y :: ys @ aux'' acc [] x 
+    | y :: ys -> aux'' (y :: acc) ys x
+  in 
+  aux'' [] sqaure_list max_ind |> Array.of_list *)
+
+
+(* slovarji *)
+
+module IntPairs =
+       struct
+         type t = int * int
+         let compare (x0,y0) (x1,y1) =
+           match Stdlib.compare x0 x1 with
+             | 0 -> Stdlib.compare y0 y1
+             | c -> c
+       end
+
+module PairsDict = Map.Make(IntPairs)
+
+let get_optimal_path (problem : Model.problem) = 
+  let empty_squares = get_empty_squares problem |> Array.to_list in 
+  let get_square_availabilty (x, y) = 
+    let box_ind = 3 * (x / 3) + (y / 3) in
+    9 - ([1;2;3;4;5;6;7;8;9] 
+    |> List.filter (fun a -> (Array.mem (Some a) (Model.get_row problem.initial_grid x) = false))
+    |> List.filter (fun a -> (Array.mem (Some a) (Model.get_column problem.initial_grid y) = false))
+    |> List.filter (fun a -> (Array.mem (Some a) (Model.get_box problem.initial_grid box_ind) = false))
+    |> List.length)
+  in 
+  let rec aux acc = function
+    | [] -> acc
+    | x :: xs -> aux (PairsDict.add x (get_square_availabilty x) acc) xs
+  in
+  let availability_dict = aux PairsDict.(empty) empty_squares in 
+  let rec get_key_with_largest_availability dict = 
+    let compare' (a, b) (a', b') = 
+      if b > b' || (b = b' && a > a') then 1 
+      else if a = a' && b = b' then 0
+      else -1
+    in 
+    PairsDict.bindings dict |> List.sort compare' |> List.rev |> List.hd |> fst
+  in 
+  let update_value dict key = 
+    if PairsDict.find_opt key dict = None then dict
+    else PairsDict.add key (PairsDict.find key dict + 1) dict 
+  in 
+  let keys_to_update (x, y) = 
+    List.init 9 (fun a -> (a, y)) 
+    @ List.init 9 (fun a -> (x, a))
+    @ List.init 9 (fun a -> (3 * (x / 3) + a / 3, y - y mod 3 + a mod 3)) 
+  in 
+  let rec update_keys dict key_list = 
+    match key_list with
+      | [] -> dict
+      | x :: xs -> update_keys (update_value dict x) xs
+  in 
+  let rec optimal_path acc dict = 
+    (* let g = PairsDict.bindings availability_dict |> List.split |> fst in
+      let () = List.iter (Printf.printf "%s ") (g |> List.map (fun (x, y) -> (string_of_int x) ^ "," ^ (string_of_int y))) in *)
+    if dict = PairsDict.(empty) then List.rev acc
+    else
+      let k = get_key_with_largest_availability dict in 
+      (* Printf.printf "(%s) " ((string_of_int (fst k)) ^ "," ^ (string_of_int (snd k)));
+      Printf.printf "Execution time: %fs\n" (Sys.time()); *)
+      let k_list = keys_to_update k in 
+      optimal_path (k :: acc) (PairsDict.(update_keys dict k_list |> remove k)) 
+  in
+  optimal_path [] availability_dict |> Array.of_list
+
+
 
 let initialize_state (problem : Model.problem) : state = 
-  let empty_squares = get_empty_squares problem in 
+  let path = get_optimal_path problem in 
   {
   current_grid = Model.copy_grid problem.initial_grid; 
   problem = problem; 
+  starting_empty_squares = path;
   available = { 
-    loc = (0, 0); 
+    loc = 0; 
     possible = [1;2;3;4;5;6;7;8;9] }
   } 
 
@@ -152,14 +253,14 @@ let branch_state (state : state) : (state * state) option =
      v prvem predpostavi, da hipoteza velja, v drugem pa ravno obratno.
      Če bo vaš algoritem najprej poizkusil prvo možnost, vam morda pri drugi
      za začetek ni treba zapravljati preveč časa, saj ne bo nujno prišla v poštev. *)  
-  let state' = find_next_empty state in
+  (* let state' = find_next_empty state in *)
   (* Poišče prvo število od 1 do 9, ki ga lahko vstavimo na trenutno mesto v sudokuju 
     in ga vrne skupaj s preostankom seznama *)
   let rec first_ok_element (list : int list) : (int * (int list)) option = 
     if list = [] then None else (
       let head = List.hd list in 
       let tail = List.tl list in 
-      match check_if_ok state' head with
+      match check_if_ok state head with
        | false -> first_ok_element tail
        | true -> Some (head, tail)
     )
@@ -168,14 +269,15 @@ let branch_state (state : state) : (state * state) option =
      se premakne na naslednje prazno mesto, druga pa na trenutnem mestu od možnosti za 
      možne elemente odstrani zgoraj omenjeno število. Če je seznam možnih števil prazen 
      vrne None. *)
-  match first_ok_element state'.available.possible with 
+  match first_ok_element state.available.possible with 
     | None -> None
     | Some (x, xs) -> Some (
-      replace_element_and_go_to_next_loc state' x,
-      { current_grid = (Model.copy_grid state'.current_grid); 
-        problem = state'.problem; 
+      replace_element_and_go_to_next_loc state x,
+      { current_grid = (Model.copy_grid state.current_grid); 
+        problem = state.problem; 
+        starting_empty_squares = state.starting_empty_squares;
         available = { 
-        loc = state'.available.loc; 
+        loc = state.available.loc; 
         possible = xs } }
     )
 
