@@ -175,19 +175,27 @@ module PairsDict = Map.Make(IntPairs)
 
 let get_optimal_path (problem : Model.problem) = 
   let empty_squares = get_empty_squares problem |> Array.to_list in 
+  let basic_value = 10 in 
+  let term_value = 25 in
   let get_square_availabilty (x, y) = 
     let box_ind = 3 * (x / 3) + (y / 3) in
-    9 - ([1;2;3;4;5;6;7;8;9] 
+    let basic = 9 - ([1;2;3;4;5;6;7;8;9] 
     |> List.filter (fun a -> (Array.mem (Some a) (Model.get_row problem.initial_grid x) = false))
     |> List.filter (fun a -> (Array.mem (Some a) (Model.get_column problem.initial_grid y) = false))
     |> List.filter (fun a -> (Array.mem (Some a) (Model.get_box problem.initial_grid box_ind) = false))
-    |> List.length)
+    |> List.length) in 
+    let term = problem.t |> List.filter (List.mem (x, y)) |> List.length in 
+    basic_value * basic + term_value * term
   in 
   let rec aux acc = function
     | [] -> acc
     | x :: xs -> aux (PairsDict.add x (get_square_availabilty x) acc) xs
   in
   let availability_dict = aux PairsDict.(empty) empty_squares in 
+  let remove_duplicates_from_list lst = 
+    let remove_el xs x = if List.mem x xs then xs else x :: xs in 
+    List.fold_left remove_el [] lst
+  in 
   let rec get_key_with_largest_availability dict = 
     let compare' (a, b) (a', b') = 
       if b > b' || (b = b' && a > a') then 1 
@@ -196,30 +204,31 @@ let get_optimal_path (problem : Model.problem) =
     in 
     PairsDict.bindings dict |> List.sort compare' |> List.rev |> List.hd |> fst
   in 
-  let update_value dict key = 
+  let update_value dict key value = 
     if PairsDict.find_opt key dict = None then dict
-    else PairsDict.add key (PairsDict.find key dict + 1) dict 
+    else PairsDict.add key (PairsDict.find key dict + value) dict 
   in 
   let keys_to_update (x, y) = 
     List.init 9 (fun a -> (a, y)) 
     @ List.init 9 (fun a -> (x, a))
     @ List.init 9 (fun a -> (3 * (x / 3) + a / 3, y - y mod 3 + a mod 3)) 
+    |> remove_duplicates_from_list
   in 
-  let rec update_keys dict key_list = 
+  let keys_to_update_term (x, y) = 
+    problem.t |> List.filter (List.mem (x, y)) |> List.flatten |> remove_duplicates_from_list
+  in 
+  let rec update_keys dict key_list value = 
     match key_list with
       | [] -> dict
-      | x :: xs -> update_keys (update_value dict x) xs
+      | x :: xs -> update_keys (update_value dict x value) xs value
   in 
   let rec optimal_path acc dict = 
-    (* let g = PairsDict.bindings availability_dict |> List.split |> fst in
-      let () = List.iter (Printf.printf "%s ") (g |> List.map (fun (x, y) -> (string_of_int x) ^ "," ^ (string_of_int y))) in *)
     if dict = PairsDict.(empty) then List.rev acc
     else
       let k = get_key_with_largest_availability dict in 
-      (* Printf.printf "(%s) " ((string_of_int (fst k)) ^ "," ^ (string_of_int (snd k)));
-      Printf.printf "Execution time: %fs\n" (Sys.time()); *)
       let k_list = keys_to_update k in 
-      optimal_path (k :: acc) (PairsDict.(update_keys dict k_list |> remove k)) 
+      let k_list_term = keys_to_update_term k in
+      optimal_path (k :: acc) (PairsDict.(update_keys dict k_list basic_value |> (fun d -> update_keys d k_list_term term_value) |> remove k)) 
   in
   optimal_path [] availability_dict |> Array.of_list
 
