@@ -153,14 +153,16 @@ let get_k (st : string) =
 type problem = { initial_grid : int option grid; 
   t : (int * int) list list; 
   a : ((int * int) * (int * int) list) list;
-  k : (int * (int * int) list) list }
+  k : (int * (int * int) list) list;
+  initial_string : string }
 
-let print_problem problem : unit = 
+let print_problem (problem: problem) : unit = 
   let string_of_element = function
     | None -> "?"
     | Some x -> string_of_int x
   in
-  print_grid string_of_element problem
+  print_grid string_of_element problem.initial_grid;
+  print_string (String.sub problem.initial_string 358 (String.length problem.initial_string - 358))
 
 let problem_of_string str =
   let cell_of_char = function
@@ -171,7 +173,8 @@ let problem_of_string str =
   { initial_grid = grid_of_string cell_of_char (get_string_of_grid_from_string str);
     t = get_t str;
     a = get_a str;
-    k = get_k str }
+    k = get_k str;
+    initial_string = str }
 
 (* Model za izhodne rešitve *)
 

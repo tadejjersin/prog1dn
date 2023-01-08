@@ -19,7 +19,7 @@ let display_solution = function
 
 let find_and_display_solution (problem : Model.problem) =
   Printf.printf "Rešujem:\n";
-  Model.print_problem problem.initial_grid;
+  Model.print_problem problem;
   Printf.printf "\n%!";
   let response, elapsed_time = find_solution problem in
   display_solution response;
