@@ -94,8 +94,8 @@ let check_if_x_fits_in_a (state : state) (x : int) =
     let left_num = if Option.is_none (fst a_values) then 0 else Option.get (fst a_values) in 
     let a_full_len = List.length (snd a) in 
     let a_len = (List.filter Option.is_some (snd a_values) |> List.length) + 1 in 
-    if current_loc = (fst a) then (if a_full_len = a_len && x != right_sum then false else true) 
-    else if (a_full_len = a_len && (right_sum + x) != left_num) || (right_sum + x > 9) then false else true
+    if current_loc = (fst a) then (if a_full_len = a_len - 1 && x != right_sum then false else true) 
+    else if (a_full_len = a_len && (right_sum + x) != left_num && left_num != 0) || (right_sum + x > 9) then false else true
   in   
   List.filter (fun y -> List.mem current_loc (snd y) || fst y = current_loc) state.problem.a |>
   List.map (myfun) 
