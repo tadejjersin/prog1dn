@@ -177,6 +177,7 @@ let get_optimal_path (problem : Model.problem) =
   let empty_squares = get_empty_squares problem |> Array.to_list in 
   let basic_value = 10 in 
   let term_value = 25 in
+  let arrow_value = 30 in 
   let get_square_availabilty (x, y) = 
     let box_ind = 3 * (x / 3) + (y / 3) in
     let basic = 9 - ([1;2;3;4;5;6;7;8;9] 
@@ -185,7 +186,8 @@ let get_optimal_path (problem : Model.problem) =
     |> List.filter (fun a -> (Array.mem (Some a) (Model.get_box problem.initial_grid box_ind) = false))
     |> List.length) in 
     let term = problem.t |> List.filter (List.mem (x, y)) |> List.length in 
-    basic_value * basic + term_value * term
+    let arrow = problem.a |> List.filter (fun arrow -> (x, y) = fst arrow || List.mem (x, y) (snd arrow)) |> List.length in
+    basic_value * basic + term_value * term + arrow_value * arrow
   in 
   let rec aux acc = function
     | [] -> acc
@@ -217,6 +219,10 @@ let get_optimal_path (problem : Model.problem) =
   let keys_to_update_term (x, y) = 
     problem.t |> List.filter (List.mem (x, y)) |> List.flatten |> remove_duplicates_from_list
   in 
+  let keys_to_update_arrow (x, y) = 
+    problem.a |> List.filter (fun arrow -> (x, y) = fst arrow || List.mem (x, y) (snd arrow)) 
+    |> List.map (fun arrow -> fst arrow :: (snd arrow)) |> List.flatten |> remove_duplicates_from_list 
+  in
   let rec update_keys dict key_list value = 
     match key_list with
       | [] -> dict
@@ -228,7 +234,12 @@ let get_optimal_path (problem : Model.problem) =
       let k = get_key_with_largest_availability dict in 
       let k_list = keys_to_update k in 
       let k_list_term = keys_to_update_term k in
-      optimal_path (k :: acc) (PairsDict.(update_keys dict k_list basic_value |> (fun d -> update_keys d k_list_term term_value) |> remove k)) 
+      let k_list_arrow = keys_to_update_arrow k in
+      optimal_path (k :: acc) (PairsDict.(
+        update_keys dict k_list basic_value 
+        |> (fun d -> update_keys d k_list_term term_value) 
+        |> (fun d-> update_keys d k_list_arrow arrow_value)
+        |> remove k)) 
   in
   optimal_path [] availability_dict |> Array.of_list
 
