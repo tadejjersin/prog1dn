@@ -178,6 +178,7 @@ let get_optimal_path (problem : Model.problem) =
   let basic_value = 10 in 
   let term_value = 25 in
   let arrow_value = 30 in 
+  let cage_value = 30 in
   let get_square_availabilty (x, y) = 
     let box_ind = 3 * (x / 3) + (y / 3) in
     let basic = 9 - ([1;2;3;4;5;6;7;8;9] 
@@ -187,7 +188,8 @@ let get_optimal_path (problem : Model.problem) =
     |> List.length) in 
     let term = problem.t |> List.filter (List.mem (x, y)) |> List.length in 
     let arrow = problem.a |> List.filter (fun arrow -> (x, y) = fst arrow || List.mem (x, y) (snd arrow)) |> List.length in
-    basic_value * basic + term_value * term + arrow_value * arrow
+    let cage = problem.k |> List.filter (fun cage -> List.mem (x, y) (snd cage)) |> List.length in
+    basic_value * basic + term_value * term + arrow_value * arrow + cage_value * cage
   in 
   let rec aux acc = function
     | [] -> acc
@@ -223,6 +225,10 @@ let get_optimal_path (problem : Model.problem) =
     problem.a |> List.filter (fun arrow -> (x, y) = fst arrow || List.mem (x, y) (snd arrow)) 
     |> List.map (fun arrow -> fst arrow :: (snd arrow)) |> List.flatten |> remove_duplicates_from_list 
   in
+  let keys_to_update_cage (x, y) = 
+    problem.k |> List.filter (fun cage -> List.mem (x, y) (snd cage)) 
+    |> List.map snd |> List.flatten |> remove_duplicates_from_list 
+  in  
   let rec update_keys dict key_list value = 
     match key_list with
       | [] -> dict
@@ -235,10 +241,12 @@ let get_optimal_path (problem : Model.problem) =
       let k_list = keys_to_update k in 
       let k_list_term = keys_to_update_term k in
       let k_list_arrow = keys_to_update_arrow k in
+      let k_list_cage = keys_to_update_cage k in
       optimal_path (k :: acc) (PairsDict.(
         update_keys dict k_list basic_value 
         |> (fun d -> update_keys d k_list_term term_value) 
         |> (fun d-> update_keys d k_list_arrow arrow_value)
+        |> (fun d -> update_keys d k_list_cage cage_value)
         |> remove k)) 
   in
   optimal_path [] availability_dict |> Array.of_list
